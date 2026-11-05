@@ -1,7 +1,7 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 
 import setuptools
-from distutils.core import setup, Extension
+from setuptools import setup, Extension
 
 setup(name='rdpy',
 	version='1.3.2',
@@ -36,12 +36,13 @@ setup(name='rdpy',
 			'bin/rdpy-vncclient.py', 
 			'bin/rdpy-vncscreenshot.py'
 		],
+	python_requires='>=3.7',
 	install_requires=[
 			'twisted',
           	'pyopenssl',
           	'service_identity',
-          	'qt4reactor',
           	'rsa',
-          	'pyasn1'
+          	'pyasn1',
+			'pycryptodome'
 	  	],
 )

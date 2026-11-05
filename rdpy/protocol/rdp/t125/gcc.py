@@ -22,9 +22,9 @@ Implement GCC structure use in RDP protocol
 http://msdn.microsoft.com/en-us/library/cc240508.aspx
 """
 
-import md5
+import hashlib
 from rdpy.core.type import UInt8, UInt16Le, UInt32Le, CompositeType, CallableValue, String, Stream, sizeof, FactoryType, ArrayType
-import per, mcs
+from . import per, mcs
 from rdpy.core.error import InvalidExpectedDataException
 from rdpy.core import log
 from rdpy.security import x509
@@ -342,9 +342,9 @@ class ProprietaryServerCertificate(CompositeType):
     _TYPE_ = CertificateType.CERT_CHAIN_VERSION_1
     
     #http://msdn.microsoft.com/en-us/library/cc240776.aspx
-    _TERMINAL_SERVICES_MODULUS_ = "\x3d\x3a\x5e\xbd\x72\x43\x3e\xc9\x4d\xbb\xc1\x1e\x4a\xba\x5f\xcb\x3e\x88\x20\x87\xef\xf5\xc1\xe2\xd7\xb7\x6b\x9a\xf2\x52\x45\x95\xce\x63\x65\x6b\x58\x3a\xfe\xef\x7c\xe7\xbf\xfe\x3d\xf6\x5c\x7d\x6c\x5e\x06\x09\x1a\xf5\x61\xbb\x20\x93\x09\x5f\x05\x6d\xea\x87"
-    _TERMINAL_SERVICES_PRIVATE_EXPONENT_ = "\x87\xa7\x19\x32\xda\x11\x87\x55\x58\x00\x16\x16\x25\x65\x68\xf8\x24\x3e\xe6\xfa\xe9\x67\x49\x94\xcf\x92\xcc\x33\x99\xe8\x08\x60\x17\x9a\x12\x9f\x24\xdd\xb1\x24\x99\xc7\x3a\xb8\x0a\x7b\x0d\xdd\x35\x07\x79\x17\x0b\x51\x9b\xb3\xc7\x10\x01\x13\xe7\x3f\xf3\x5f"
-    _TERMINAL_SERVICES_PUBLIC_EXPONENT_ = "\x5b\x7b\x88\xc0"
+    _TERMINAL_SERVICES_MODULUS_ = b"\x3d\x3a\x5e\xbd\x72\x43\x3e\xc9\x4d\xbb\xc1\x1e\x4a\xba\x5f\xcb\x3e\x88\x20\x87\xef\xf5\xc1\xe2\xd7\xb7\x6b\x9a\xf2\x52\x45\x95\xce\x63\x65\x6b\x58\x3a\xfe\xef\x7c\xe7\xbf\xfe\x3d\xf6\x5c\x7d\x6c\x5e\x06\x09\x1a\xf5\x61\xbb\x20\x93\x09\x5f\x05\x6d\xea\x87"
+    _TERMINAL_SERVICES_PRIVATE_EXPONENT_ = b"\x87\xa7\x19\x32\xda\x11\x87\x55\x58\x00\x16\x16\x25\x65\x68\xf8\x24\x3e\xe6\xfa\xe9\x67\x49\x94\xcf\x92\xcc\x33\x99\xe8\x08\x60\x17\x9a\x12\x9f\x24\xdd\xb1\x24\x99\xc7\x3a\xb8\x0a\x7b\x0d\xdd\x35\x07\x79\x17\x0b\x51\x9b\xb3\xc7\x10\x01\x13\xe7\x3f\xf3\x5f"
+    _TERMINAL_SERVICES_PUBLIC_EXPONENT_ = b"\x5b\x7b\x88\xc0"
     
     def __init__(self):
         CompositeType.__init__(self)
@@ -378,10 +378,10 @@ class ProprietaryServerCertificate(CompositeType):
         s.writeType(self.wPublicKeyBlobLen)
         s.writeType(self.PublicKeyBlob)
     
-        md5Digest = md5.new()
+        md5Digest = hashlib.md5()
         md5Digest.update(s.getvalue())
         
-        return md5Digest.digest() + "\x00" + "\xff" * 45 + "\x01"
+        return md5Digest.digest() + b"\x00" + b"\xff" * 45 + b"\x01"
         
     def sign(self):
         """
@@ -445,7 +445,7 @@ class RSAPublicKey(CompositeType):
         self.magic = UInt32Le(0x31415352, constant = True)
         self.keylen = UInt32Le(lambda:(sizeof(self.modulus) + sizeof(self.padding)))
         self.bitlen = UInt32Le(lambda:((self.keylen.value - 8) * 8))
-        self.datalen = UInt32Le(lambda:((self.bitlen.value / 8) - 1))
+        self.datalen = UInt32Le(lambda:((self.bitlen.value // 8) - 1))
         self.pubExp = UInt32Le()
         self.modulus = String(readLen = CallableValue(lambda:(self.keylen.value - 8)))
         self.padding = String("\x00" * 8, readLen = CallableValue(8))

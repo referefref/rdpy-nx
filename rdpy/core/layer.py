@@ -107,7 +107,7 @@ class LayerAutomata(Layer, IStreamListener):
 from twisted.internet import protocol
 from twisted.internet.abstract import FileDescriptor
 #first that handle stream     
-from type import Stream
+from .type import Stream
 
 class RawLayerClientFactory(protocol.ClientFactory):
     """
@@ -179,7 +179,7 @@ class RawLayer(protocol.Protocol, LayerAutomata, IStreamSender):
         #call parent automata
         LayerAutomata.__init__(self, presentation)
         #data buffer received from twisted network layer
-        self._buffer = ""
+        self._buffer = b""
         #len of next packet pass to next state function
         self._expectedLen = 0
         self._factory = None

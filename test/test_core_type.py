@@ -139,7 +139,7 @@ class TypeTest(unittest.TestCase):
         """
         s = rdpy.core.type.Stream()
         s.writeType(rdpy.core.type.UInt8(1))
-        self.assertEqual(''.join(s.buflist), '\x01', "invalid stream write")
+        self.assertEqual(s.getvalue(), b'\x01', "invalid stream write")
         
     def test_stream_write_uint16Le_type(self):
         """
@@ -147,7 +147,7 @@ class TypeTest(unittest.TestCase):
         """
         s = rdpy.core.type.Stream()
         s.writeType(rdpy.core.type.UInt16Le(1))
-        self.assertEqual(''.join(s.buflist), '\x01\x00', "invalid stream write")
+        self.assertEqual(s.getvalue(), b'\x01\x00', "invalid stream write")
     
     def test_stream_write_uint16Be_type(self):
         """
@@ -155,7 +155,7 @@ class TypeTest(unittest.TestCase):
         """
         s = rdpy.core.type.Stream()
         s.writeType(rdpy.core.type.UInt16Be(1))
-        self.assertEqual(''.join(s.buflist), '\x00\x01', "invalid stream write")
+        self.assertEqual(s.getvalue(), b'\x00\x01', "invalid stream write")
         
     def test_stream_write_uint24Le_type(self):
         """
@@ -163,7 +163,7 @@ class TypeTest(unittest.TestCase):
         """
         s = rdpy.core.type.Stream()
         s.writeType(rdpy.core.type.UInt24Le(1))
-        self.assertEqual(''.join(s.buflist), '\x01\x00\x00', "invalid stream write")
+        self.assertEqual(s.getvalue(), b'\x01\x00\x00', "invalid stream write")
     
     def test_stream_write_uint24Be_type(self):
         """
@@ -171,7 +171,7 @@ class TypeTest(unittest.TestCase):
         """
         s = rdpy.core.type.Stream()
         s.writeType(rdpy.core.type.UInt24Be(1))
-        self.assertEqual(''.join(s.buflist), '\x00\x00\x01', "invalid stream write")
+        self.assertEqual(s.getvalue(), b'\x00\x00\x01', "invalid stream write")
         
     def test_stream_write_uint32Le_type(self):
         """
@@ -179,7 +179,7 @@ class TypeTest(unittest.TestCase):
         """
         s = rdpy.core.type.Stream()
         s.writeType(rdpy.core.type.UInt32Le(1))
-        self.assertEqual(''.join(s.buflist), '\x01\x00\x00\x00', "invalid stream write")
+        self.assertEqual(s.getvalue(), b'\x01\x00\x00\x00', "invalid stream write")
     
     def test_stream_write_uint32Be_type(self):
         """
@@ -187,7 +187,7 @@ class TypeTest(unittest.TestCase):
         """
         s = rdpy.core.type.Stream()
         s.writeType(rdpy.core.type.UInt32Be(1))
-        self.assertEqual(''.join(s.buflist), '\x00\x00\x00\x01', "invalid stream write")
+        self.assertEqual(s.getvalue(), b'\x00\x00\x00\x01', "invalid stream write")
         
     def test_stream_read_uint8_type(self):
         """

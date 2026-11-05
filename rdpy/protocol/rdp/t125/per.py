@@ -220,7 +220,7 @@ def readNumericString(s, minValue):
     @param minValue: offset
     """
     length = readLength(s)
-    length = (length + minValue + 1) / 2
+    length = (length + minValue + 1) // 2
     s.read(length)
 
 def writeNumericString(nStr, minValue):
@@ -238,9 +238,9 @@ def writeNumericString(nStr, minValue):
     result = []
     
     for i in range(0, length, 2):
-        c1 = ord(nStr[i])
+        c1 = nStr[i] if isinstance(nStr, bytes) else ord(nStr[i])
         if i + 1 < length:
-            c2 = ord(nStr[i + 1])
+            c2 = nStr[i + 1] if isinstance(nStr, bytes) else ord(nStr[i + 1])
         else:
             c2 = 0x30
         c1 = (c1 - 0x30) % 10
@@ -276,11 +276,11 @@ def readOctetStream(s, octetStream, minValue = 0):
     """
     size = readLength(s) + minValue
     if size != len(octetStream):
-        raise InvalidValue("incompatible size %d != %d"(len(octetStream), size))
+        raise InvalidValue("incompatible size %d != %d"%(len(octetStream), size))
     for i in range(0, size):
         c = UInt8()
         s.readType(c)
-        if ord(octetStream[i]) != c.value:
+        if (octetStream[i] if isinstance(octetStream, bytes) else ord(octetStream[i])) != c.value:
             return False
         
     return True
@@ -300,6 +300,6 @@ def writeOctetStream(oStr, minValue = 0):
     
     result = []
     for i in range(0, length):
-        result.append(UInt8(ord(oStr[i])))
+        result.append(UInt8(oStr[i] if isinstance(oStr, bytes) else ord(oStr[i])))
     
     return (writeLength(mlength), tuple(result))

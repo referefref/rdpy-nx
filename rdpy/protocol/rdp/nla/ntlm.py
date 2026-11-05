@@ -23,7 +23,7 @@
 """
 
 import hashlib, hmac, struct, datetime
-import sspi
+from . import sspi
 import rdpy.security.pyDes as pyDes
 import rdpy.security.rc4 as rc4
 from rdpy.security.rsa_wrapper import random
@@ -314,15 +314,16 @@ def expandDesKey(key):
     """
     @summary: Expand the key from a 7-byte password key into a 8-byte DES key
     """
-    s = chr(((ord(key[0]) >> 1) & 0x7f) << 1)
-    s = s + chr(((ord(key[0]) & 0x01) << 6 | ((ord(key[1]) >> 2) & 0x3f)) << 1)
-    s = s + chr(((ord(key[1]) & 0x03) << 5 | ((ord(key[2]) >> 3) & 0x1f)) << 1)
-    s = s + chr(((ord(key[2]) & 0x07) << 4 | ((ord(key[3]) >> 4) & 0x0f)) << 1)
-    s = s + chr(((ord(key[3]) & 0x0f) << 3 | ((ord(key[4]) >> 5) & 0x07)) << 1)
-    s = s + chr(((ord(key[4]) & 0x1f) << 2 | ((ord(key[5]) >> 6) & 0x03)) << 1)
-    s = s + chr(((ord(key[5]) & 0x3f) << 1 | ((ord(key[6]) >> 7) & 0x01)) << 1)
-    s = s + chr((ord(key[6]) & 0x7f) << 1)
-    return s
+    key = bytes(key)
+    s = [((key[0] >> 1) & 0x7f) << 1]
+    s.append(((key[0] & 0x01) << 6 | ((key[1] >> 2) & 0x3f)) << 1)
+    s.append(((key[1] & 0x03) << 5 | ((key[2] >> 3) & 0x1f)) << 1)
+    s.append(((key[2] & 0x07) << 4 | ((key[3] >> 4) & 0x0f)) << 1)
+    s.append(((key[3] & 0x0f) << 3 | ((key[4] >> 5) & 0x07)) << 1)
+    s.append(((key[4] & 0x1f) << 2 | ((key[5] >> 6) & 0x03)) << 1)
+    s.append(((key[5] & 0x3f) << 1 | ((key[6] >> 7) & 0x01)) << 1)
+    s.append((key[6] & 0x7f) << 1)
+    return bytes([c & 0xff for c in s])
 
 def CurrentFileTimes():
     """
@@ -345,7 +346,7 @@ def DESL(key, data):
     @param key: {str} Des key
     @param data: {str} encrypted data
     """
-    return DES(key[0:7], data) + DES(key[7:14], data) + DES(key[14:16] + "\x00" * 5, data)
+    return DES(key[0:7], data) + DES(key[7:14], data) + DES(key[14:16] + b"\x00" * 5, data)
 
 def UNICODE(s):
     """
@@ -360,7 +361,12 @@ def MD4(s):
     @param s: {str} input data
     @return: {str} MD4(s)
     """
-    return hashlib.new('md4', s).digest()
+    try:
+        return hashlib.new('md4', s).digest()
+    except ValueError:
+        #OpenSSL 3 moved MD4 to the legacy provider
+        from Crypto.Hash import MD4 as _MD4
+        return _MD4.new(s).digest()
 
 def MD5(s):
     """
@@ -376,7 +382,7 @@ def Z(m):
     @param m: {int} size of string
     @return: \x00 * m 
     """
-    return "\x00" * m
+    return b"\x00" * m
 
 def RC4K(key, plaintext):
     """
@@ -399,15 +405,15 @@ def KXKEYv2(SessionBaseKey, LmChallengeResponse, ServerChallenge):
 
 def SEALKEY(ExportedSessionKey, client):
     if client:
-        return MD5(ExportedSessionKey + "session key to client-to-server sealing key magic constant\0")
+        return MD5(ExportedSessionKey + "session key to client-to-server sealing key magic constant\0".encode("latin-1"))
     else:
-        return MD5(ExportedSessionKey + "session key to server-to-client sealing key magic constant\0")
+        return MD5(ExportedSessionKey + "session key to server-to-client sealing key magic constant\0".encode("latin-1"))
 
 def SIGNKEY(ExportedSessionKey, client):
     if client:
-        return MD5(ExportedSessionKey + "session key to client-to-server signing key magic constant\0")
+        return MD5(ExportedSessionKey + "session key to client-to-server signing key magic constant\0".encode("latin-1"))
     else:
-        return MD5(ExportedSessionKey + "session key to server-to-client signing key magic constant\0")
+        return MD5(ExportedSessionKey + "session key to server-to-client signing key magic constant\0".encode("latin-1"))
 
 def HMAC_MD5(key, data):
     """
@@ -443,8 +449,8 @@ def ComputeResponsev2(ResponseKeyNT, ResponseKeyLM, ServerChallenge, ClientChall
     @param NegFlg: {int} Negotiation flags come from challenge message
     @see: https://msdn.microsoft.com/en-us/library/cc236700.aspx
     """
-    Responserversion = "\x01"
-    HiResponserversion = "\x01"
+    Responserversion = b"\x01"
+    HiResponserversion = b"\x01"
 
     temp = Responserversion + HiResponserversion + Z(6) + Time + ClientChallenge + Z(4) + ServerName
     NTProofStr = HMAC_MD5(ResponseKeyNT, ServerChallenge + temp)
@@ -538,7 +544,7 @@ class NTLMv2(sspi.IAuthenticationProtocol):
         computeMIC = False
         ServerName = self._challengeMessage.getTargetInfo()
         infos = self._challengeMessage.getTargetInfoAsAvPairArray()
-        if infos.has_key(AvId.MsvAvTimestamp):
+        if AvId.MsvAvTimestamp in infos:
             Timestamp = infos[AvId.MsvAvTimestamp]
             computeMIC = True
         else:
@@ -554,7 +560,7 @@ class NTLMv2(sspi.IAuthenticationProtocol):
         if self._challengeMessage.NegotiateFlags.value & Negotiate.NTLMSSP_NEGOTIATE_UNICODE:
             self._enableUnicode = True
             domain, user = UNICODE(domain), UNICODE(user)
-        self._authenticateMessage = createAuthenticationMessage(self._challengeMessage.NegotiateFlags.value, domain, user, NtChallengeResponse, LmChallengeResponse, EncryptedRandomSessionKey, "")
+        self._authenticateMessage = createAuthenticationMessage(self._challengeMessage.NegotiateFlags.value, domain, user, NtChallengeResponse, LmChallengeResponse, EncryptedRandomSessionKey, b"")
         
         if computeMIC:
             self._authenticateMessage.MIC.value = MIC(ExportedSessionKey, self._negotiateMessage, self._challengeMessage, self._authenticateMessage)
@@ -578,7 +584,7 @@ class NTLMv2(sspi.IAuthenticationProtocol):
         if self._enableUnicode:
             return UNICODE(self._domain), UNICODE(self._user), UNICODE(self._password)
         else:
-            return self._domain, self._user, self._password
+            return self._domain.encode("latin-1"), self._user.encode("latin-1"), self._password.encode("latin-1")
         
 
 class NTLMv2SecurityInterface(sspi.IGenericSecurityService):

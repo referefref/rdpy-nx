@@ -26,7 +26,7 @@ We are in python!
 
 import struct
 from copy import deepcopy
-from StringIO import StringIO
+from io import BytesIO
 from rdpy.core.error import InvalidExpectedDataException, InvalidSize, CallPureVirtualFuntion, InvalidValue
 import rdpy.core.log as log
 
@@ -266,7 +266,7 @@ class SimpleType(Type, CallableValue):
                     Because in Python all numbers are Int long or float
                     Cache result in self._mask field
         """
-        if not self.__dict__.has_key("_mask"):
+        if "_mask" not in self.__dict__:
             mask = 0xff
             for _ in range(1, self._typeSize):
                 mask = mask << 8 | 0xff
@@ -291,17 +291,48 @@ class SimpleType(Type, CallableValue):
         """
         return self._typeSize
     
-    def __cmp__(self, other):
+    def _otherValue(self, other):
+        """
+        @summary: inner value of other (SimpleType or raw python value)
+        """
+        if isinstance(other, SimpleType):
+            return other.value
+        return other
+
+    def __eq__(self, other):
         """
         @summary:  Compare two simple type
                     Call inner value compare operator
-        @param other:  SimpleType value or try to build same type as self
-                        around value
+        @param other:  SimpleType value or raw python integer
         @return: python value compare
         """
-        if not isinstance(other, SimpleType):
-            other = self.__class__(other)
-        return self.value.__cmp__(other.value)
+        if not isinstance(other, (SimpleType, int)):
+            return NotImplemented
+        return self.value == self._otherValue(other)
+
+    def __ne__(self, other):
+        result = self.__eq__(other)
+        if result is NotImplemented:
+            return result
+        return not result
+
+    def __lt__(self, other):
+        return self.value < self._otherValue(other)
+
+    def __le__(self, other):
+        return self.value <= self._otherValue(other)
+
+    def __gt__(self, other):
+        return self.value > self._otherValue(other)
+
+    def __ge__(self, other):
+        return self.value >= self._otherValue(other)
+
+    def __int__(self):
+        return self.value
+
+    def __index__(self):
+        return self.value
     
     def __invert__(self):
         """
@@ -404,7 +435,7 @@ class SimpleType(Type, CallableValue):
         """
         return hash(self.value)
     
-    def __nonzero__(self):
+    def __bool__(self):
         """
         @summary: Boolean conversion
         @return: bool of inner value
@@ -513,6 +544,8 @@ class CompositeType(Type):
         @param other: CompositeType
         @return: True if each sub-type are equals
         """
+        if not isinstance(other, CompositeType):
+            return NotImplemented
         if self._typeName != other._typeName:
             return False
         for name in self._typeName:
@@ -526,7 +559,12 @@ class CompositeType(Type):
         @param other: CompositeType
         @return: False if each subtype are equals
         """
-        return not self.__eq__(other)
+        result = self.__eq__(other)
+        if result is NotImplemented:
+            return result
+        return not result
+
+    __hash__ = object.__hash__
 
 """
 All simple Raw type use in RDPY
@@ -703,7 +741,7 @@ class UInt24Be(SimpleType):
         @summary: special read for a special type
         @param s: Stream
         """
-        self.value = struct.unpack(self._structFormat, '\x00' + s.read(self._typeSize))[0]
+        self.value = struct.unpack(self._structFormat, b'\x00' + s.read(self._typeSize))[0]
         
 class UInt24Le(SimpleType):
     """
@@ -734,7 +772,7 @@ class UInt24Le(SimpleType):
         @summary: special read for a special type
         @param s: Stream
         """
-        self.value = struct.unpack(self._structFormat, s.read(self._typeSize) + '\x00')[0]
+        self.value = struct.unpack(self._structFormat, s.read(self._typeSize) + b'\x00')[0]
         
 class String(Type, CallableValue):
     """
@@ -760,40 +798,76 @@ class String(Type, CallableValue):
         self._unicode = unicode
         self._until = until
         
-    def __cmp__(self, other):
+    def __getValue__(self):
+        """
+        @summary: evaluate inner value
+                    binary strings are always bytes
+                    (python str values are encoded as latin-1)
+                    unicode strings are always python str
+        """
+        value = CallableValue.__getValue__(self)
+        if self._unicode:
+            if isinstance(value, (bytes, bytearray)):
+                value = value.decode("latin-1")
+        elif isinstance(value, str):
+            try:
+                value = value.encode("latin-1")
+            except UnicodeEncodeError:
+                value = value.encode("utf-8")
+        elif isinstance(value, bytearray):
+            value = bytes(value)
+        return value
+
+    def __eq__(self, other):
         """
         @summary: call raw compare value
-        @param other: other String parameter
+        @param other: other String parameter or python string
         @return: if two inner value are equals
         """
-        return cmp(self.value, other.value)
-    
+        if isinstance(other, String):
+            return self.value == other.value
+        if isinstance(other, (bytes, str)):
+            return self.value == String(other, unicode = self._unicode).value
+        return NotImplemented
+
+    def __ne__(self, other):
+        result = self.__eq__(other)
+        if result is NotImplemented:
+            return result
+        return not result
+
     def __hash__(self):
         """
         @summary: hash function to treat simple type in hash collection
         @return: hash of inner value
         """
         return hash(self.value)
-    
+
     def __str__(self):
         """
         @summary: call when str function is call
         @return: inner python string
         """
+        value = self.value
+        if isinstance(value, bytes):
+            return value.decode("latin-1")
+        return value
+
+    def __bytes__(self):
+        """
+        @summary: call when bytes function is call
+        @return: inner value as bytes
+        """
+        if self._unicode:
+            return encodeUnicode(self.value)
         return self.value
-    
+
     def __write__(self, s):
         """
         @summary:  Write the inner value after evaluation
-                    Append until sequence if present
                     Encode in unicode format if asked
         @param s: Stream
         """
-        toWrite = self.value
-        
-        if not self._until is None:
-            toWrite += self._until
-            
         if self._unicode:
             s.write(encodeUnicode(self.value))
         else:
@@ -808,16 +882,19 @@ class String(Type, CallableValue):
         """
         if self._readLen is None:
             if self._until is None:
-                self.value = s.getvalue()[s.pos:]
+                raw = s.getvalue()[s.pos:]
             else:
-                self.value = ""
-                while self.value[-len(self._until):] != self._until and s.dataLen() != 0:
-                    self.value += s.read(1)
+                until = self._until.encode("latin-1") if isinstance(self._until, str) else self._until
+                raw = b""
+                while raw[-len(until):] != until and s.dataLen() != 0:
+                    raw += s.read(1)
         else:
-            self.value = s.read(self._readLen.value)
-        
+            raw = s.read(self._readLen.value)
+
         if self._unicode:
-            self.value = decodeUnicode(self.value)
+            self.value = decodeUnicode(raw)
+        else:
+            self.value = raw
         
     def __sizeof__(self):
         """
@@ -826,7 +903,7 @@ class String(Type, CallableValue):
         @return: length of inner string
         """
         if self._unicode:
-            return 2 * len(self.value) + 2
+            return len(encodeUnicode(self.value))
         else:
             return len(self.value)
     
@@ -836,26 +913,59 @@ def encodeUnicode(s):
     @param s: str python
     @return: unicode string
     """
-    return "".join([c + "\x00" for c in s]) + "\x00\x00"
+    if isinstance(s, (bytes, bytearray)):
+        s = s.decode("latin-1")
+    return s.encode("utf-16-le", "surrogatepass") + b"\x00\x00"
 
 def decodeUnicode(s):
     """
     @summary: Decode Unicode string
-    @param s: unicode string
+    @param s: unicode string (UTF-16LE bytes with terminator)
     @return: str python
     """
-    i = 0
-    r = ""
-    while i < len(s) - 2:
-        if i % 2 == 0:
-            r += s[i]
-        i += 1
-    return r
+    s = bytes(s[:-2])
+    if len(s) % 2:
+        s += b"\x00"
+    return s.decode("utf-16-le", "surrogatepass")
 
-class Stream(StringIO):
+class Stream(BytesIO):
     """
     @summary:  Stream use to read all types
     """
+    def __init__(self, initial = b""):
+        """
+        @param initial: bytes (python str are encoded as latin-1)
+        """
+        if isinstance(initial, str):
+            initial = initial.encode("latin-1")
+        BytesIO.__init__(self, bytes(initial))
+
+    @property
+    def pos(self):
+        """
+        @summary: current position (StringIO compatibility)
+        """
+        return self.tell()
+
+    @pos.setter
+    def pos(self, value):
+        self.seek(value)
+
+    @property
+    def len(self):
+        """
+        @summary: length of stream (StringIO compatibility)
+        """
+        return len(self.getbuffer())
+
+    def write(self, data):
+        """
+        @summary: write bytes (python str are encoded as latin-1)
+        """
+        if isinstance(data, str):
+            data = data.encode("latin-1")
+        return BytesIO.write(self, data)
+
     def dataLen(self):
         """
         @return: not yet read length

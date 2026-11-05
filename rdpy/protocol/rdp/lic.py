@@ -25,8 +25,8 @@
 from rdpy.core.type import CompositeType, CallableValue, UInt8, UInt16Le, UInt32Le, String, sizeof, FactoryType, ArrayType, Stream
 from rdpy.core.error import InvalidExpectedDataException
 import rdpy.core.log as log
-import sec
-from t125 import gcc
+from . import sec
+from .t125 import gcc
 from rdpy.security import rc4
 from rdpy.security import rsa_wrapper as rsa
 
@@ -321,7 +321,7 @@ class LicenseManager(object):
         #format message
         message = ClientNewLicenseRequest()
         message.clientRandom.value = clientRandom
-        message.encryptedPreMasterSecret.blobData.value = rsa.encrypt(preMasterSecret[::-1], serverCertificate.certData.getPublicKey())[::-1] + "\x00" * 8
+        message.encryptedPreMasterSecret.blobData.value = rsa.encrypt(preMasterSecret[::-1], serverCertificate.certData.getPublicKey())[::-1] + b"\x00" * 8
         message.ClientMachineName.blobData.value = self._hostname + "\x00"
         message.ClientUserName.blobData.value = self._username + "\x00"
         self._transport.sendFlagged(sec.SecurityFlag.SEC_LICENSE_PKT, LicPacket(message))
@@ -335,7 +335,7 @@ class LicenseManager(object):
         #decrypt server challenge
         #it should be TEST word in unicode format
         serverChallenge = rc4.crypt(rc4.RC4Key(self._licenseKey), serverEncryptedChallenge)
-        if serverChallenge != "T\x00E\x00S\x00T\x00\x00\x00":
+        if serverChallenge != b"T\x00E\x00S\x00T\x00\x00\x00":
             raise InvalidExpectedDataException("bad license server challenge")
         
         #generate hwid

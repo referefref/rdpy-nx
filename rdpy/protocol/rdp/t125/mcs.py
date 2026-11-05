@@ -27,10 +27,10 @@ It exist channel for file system order, audio channel, clipboard etc...
 from rdpy.core.layer import LayerAutomata, IStreamSender, Layer
 from rdpy.core.type import sizeof, Stream, UInt8, UInt16Le, String
 from rdpy.core.error import InvalidExpectedDataException, InvalidValue, InvalidSize, CallPureVirtualFuntion
-from ber import writeLength
+from .ber import writeLength
 import rdpy.core.log as log
 
-import ber, gcc, per
+from . import ber, gcc, per
 import rdpy.security.rsa_wrapper as rsa
 
 class Message(object):
@@ -194,7 +194,7 @@ class MCSLayer(LayerAutomata):
         #connection is done
         self.setNextState(self.recvData)
         #try connection on all requested channel
-        for (channelId, layer) in self._channels.iteritems():
+        for (channelId, layer) in self._channels.items():
             #use proxy for each channel
             MCSLayer.MCSProxySender(layer, self, channelId).connect()
     
@@ -236,7 +236,7 @@ class MCSLayer(LayerAutomata):
         per.readLength(data)
         
         #channel id doesn't match a requested layer
-        if not self._channels.has_key(channelId):
+        if channelId not in self._channels:
             log.error("receive data for an unconnected layer")
             return
 
@@ -581,7 +581,7 @@ class Server(MCSLayer):
         
         channelId = per.readInteger16(data)
         #actually algo support virtual channel but RDPY have no virtual channel
-        confirm = 0 if channelId in self._channels.keys() or channelId == self._userId else 1
+        confirm = 0 if channelId in list(self._channels.keys()) or channelId == self._userId else 1
         self.sendChannelJoinConfirm(channelId, confirm)
         self._nbChannelConfirmed += 1
         if self._nbChannelConfirmed == self._serverSettings.getBlock(gcc.MessageType.SC_NET).channelCount.value + 2:

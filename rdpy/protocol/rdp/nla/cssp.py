@@ -262,8 +262,8 @@ class CSSP(protocol.Protocol):
         pubKey = der_decoder.decode(pubKeyDer, asn1Spec=OpenSSLRSAPublicKey())[0]
         
         rsa = x509.RSAPublicKey()
-        rsa.setComponentByName("modulus", univ.Integer(pubKey.getComponentByName('modulus')._value))
-        rsa.setComponentByName("publicExponent", univ.Integer(pubKey.getComponentByName('publicExponent')._value))
+        rsa.setComponentByName("modulus", univ.Integer(int(pubKey.getComponentByName('modulus'))))
+        rsa.setComponentByName("publicExponent", univ.Integer(int(pubKey.getComponentByName('publicExponent'))))
         self._pubKeyBer = ber_encoder.encode(rsa)
         
         #send authenticate message with public key encoded
@@ -279,7 +279,7 @@ class CSSP(protocol.Protocol):
         request = decodeDERTRequest(data)
         pubKeyInc = self._interface.GSS_UnWrapEx(getPubKeyAuth(request))
         #check pubKeyInc = self._pubKeyBer + 1
-        if not (self._pubKeyBer[1:] == pubKeyInc[1:] and ord(self._pubKeyBer[0]) + 1 == ord(pubKeyInc[0])):
+        if not (self._pubKeyBer[1:] == pubKeyInc[1:] and self._pubKeyBer[0] + 1 == pubKeyInc[0]):
             raise error.InvalidExpectedDataException("CSSP : Invalid public key increment")
         
         domain, user, password = self._authenticationProtocol.getEncodedCredentials()
