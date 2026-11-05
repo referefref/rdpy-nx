@@ -294,7 +294,7 @@ class BitmapCapability(CompositeType):
         self.bitmapCompressionFlag = UInt16Le(0x0001, constant = True)
         self.highColorFlags = UInt8(0)
         self.drawingFlags = UInt8()
-        self.multipleRectangleSupport = UInt16Le(0x0001, constant = True)
+        self.multipleRectangleSupport = UInt16Le(0x0001)
         self.pad2octetsB = UInt16Le()
         
 class OrderCapability(CompositeType):

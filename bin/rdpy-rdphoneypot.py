@@ -99,6 +99,10 @@ class HoneyPotServer(rdp.RDPServerObserver):
             return
         
         e = self._rssFile.nextEvent()
+        if e is None:
+            #scenario without close event (interrupted recording)
+            self._controller.close()
+            return
         reactor.callLater(float(e.timestamp.value) / 1000.0, lambda:self.loopScenario(e))
         
 class HoneyPotServerFactory(rdp.ServerFactory):
