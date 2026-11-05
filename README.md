@@ -1,4 +1,22 @@
-# RDPY [![Build Status](https://travis-ci.org/citronneur/rdpy.svg?branch=dev)](https://travis-ci.org/citronneur/rdpy) [![PyPI version](https://badge.fury.io/py/rdpy.png)](http://badge.fury.io/py/rdpy)
+# RDPY-nx
+
+Adapted from https://github.com/citronneur/rdpy by Sylvain Peyrefitte (citronneur).
+
+This is a standalone copy of RDPY (last upstream commit cef16a9, April 2020) ported to Python 3, with the upstream history and the GNU GPL v3 licence kept. Upstream RDPY runs only on Python 2.7, which current Linux distributions no longer ship. Changes:
+
+- Python 3 port (tested on Python 3.11 with Twisted 26, pyOpenSSL 26, rsa 4.9, pyasn1): bytes-based `Stream` and `String` types, rich comparisons, `hashlib`, integer RSA helpers, relative imports, the `rle` C extension on the Python 3 module API, a TLS client context that negotiates current TLS versions, and an MD4 fallback to pycryptodome for NLA on OpenSSL 3. The upstream unit tests are updated for bytes and pass.
+- Client interoperability with xrdp (the info packet sets `INFO_MAXIMIZESHELL`, and a bitmap capability without multiple-rectangle support is accepted), so `rdpy-rdpmitm.py` can record sessions from xrdp servers.
+- `rdpy-rdphoneypot.py` closes the session when a scenario file ends without a close event, instead of failing in the replay loop.
+- New `bin/rdpy-rssrecord.py`: a headless recorder that writes an RDP server's screen (for example its login screen) to an rss scenario for the honeypot, replacing the `-r` option of the Qt4 client.
+- `qt4reactor` is no longer a dependency. The Qt4 tools (`rdpy-rdpclient`, `rdpy-vncclient`, `rdpy-rdpscreenshot`, `rdpy-vncscreenshot`, `rdpy-rssplayer`) are converted to Python 3 syntax but need PyQt4, which does not exist for Python 3, and are untested. The honeypot, the MITM proxy, the recorder and the library work without Qt.
+
+Install: `pip install .` (needs a C compiler and the Python headers for the `rle` extension).
+
+The original README follows.
+
+---
+
+# RDPY
 
 Remote Desktop Protocol in twisted python.
 
